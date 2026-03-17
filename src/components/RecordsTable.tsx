@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { lerDados, toggleConcluido } from "@/lib/storage";
-import { VehicleRecord } from "@/lib/types";
+import { VehicleRecord, UserSession } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle2, FileText, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,9 +16,10 @@ function todayStr() {
 
 interface Props {
   refreshKey: number;
+  session: UserSession;
 }
 
-export default function RecordsTable({ refreshKey }: Props) {
+export default function RecordsTable({ refreshKey, session }: Props) {
   const [date, setDate] = useState(todayStr());
   const [records, setRecords] = useState<VehicleRecord[]>([]);
 
@@ -44,63 +44,78 @@ export default function RecordsTable({ refreshKey }: Props) {
     doc.save(`frota_${date}.pdf`);
   };
 
+  const canCheck = (r: VehicleRecord) => {
+    if (session.perfil === "ADMIN") return true;
+    // RESTRITO: only show check when Carga + Pátio
+    return r.estado === "Carga" && r.local === "Pátio";
+  };
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+    <div className="glass-card rounded-2xl overflow-hidden">
+      <div className="flex flex-row items-center justify-between gap-4 flex-wrap p-5 border-b border-border/30">
         <div className="flex items-center gap-2">
           <Monitor className="h-4 w-4 text-primary" />
-          <CardTitle className="text-base">Movimentações</CardTitle>
+          <h2 className="font-orbitron text-sm font-bold text-primary neon-text">MONITORAMENTO</h2>
         </div>
         <div className="flex items-center gap-2">
-          <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-auto text-sm" />
-          <Button variant="outline" size="sm" onClick={handlePDF} className="gap-1.5">
-            <FileText className="h-3.5 w-3.5" /> PDF
+          <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-auto text-sm bg-input border-border/50 font-orbitron text-xs" />
+          <Button variant="outline" size="sm" onClick={handlePDF} className="gap-1.5 border-border/50 hover:border-primary hover:text-primary font-orbitron text-xs">
+            <FileText className="h-3.5 w-3.5" /> PDF 📃
           </Button>
         </div>
-      </CardHeader>
-      <CardContent className="overflow-x-auto">
+      </div>
+      <div className="overflow-x-auto p-2">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="w-10"></TableHead>
-              <TableHead>Placa</TableHead>
-              <TableHead>Frota</TableHead>
-              <TableHead>Carga</TableHead>
-              <TableHead>Local</TableHead>
-              <TableHead>Eixo</TableHead>
-              <TableHead>Modelo</TableHead>
-              <TableHead>Segurança</TableHead>
+            <TableRow className="border-border/30 hover:bg-transparent">
+              <TableHead className="w-12 font-orbitron text-[0.65rem]">Check</TableHead>
+              <TableHead className="font-orbitron text-[0.65rem] text-primary">Placa</TableHead>
+              <TableHead className="font-orbitron text-[0.65rem]">Frota</TableHead>
+              <TableHead className="font-orbitron text-[0.65rem]">Carga</TableHead>
+              <TableHead className="font-orbitron text-[0.65rem]">Local</TableHead>
+              <TableHead className="font-orbitron text-[0.65rem]">Eixo</TableHead>
+              <TableHead className="font-orbitron text-[0.65rem]">Modelo</TableHead>
+              <TableHead className="font-orbitron text-[0.65rem]">Segurança</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {records.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-10 font-orbitron text-xs">
                   Nenhum registro para esta data.
                 </TableCell>
               </TableRow>
             ) : records.map(r => (
-              <TableRow key={r.id} className={cn(r.concluido && "opacity-30 line-through")}>
+              <TableRow key={r.id} className={cn("border-border/20 transition-all duration-300", r.concluido && "opacity-20 line-through")}>
                 <TableCell>
-                  <button onClick={() => handleToggle(r.id)}
-                    className={cn("h-7 w-7 rounded-full border-2 flex items-center justify-center transition-colors",
-                      r.concluido ? "border-accent bg-accent text-accent-foreground" : "border-muted-foreground text-muted-foreground hover:border-accent hover:text-accent"
-                    )}>
-                    <CheckCircle2 className="h-4 w-4" />
-                  </button>
+                  {canCheck(r) ? (
+                    <button
+                      onClick={() => handleToggle(r.id)}
+                      className={cn(
+                        "h-8 w-8 rounded-full border-2 flex items-center justify-center transition-all duration-300",
+                        r.concluido
+                          ? "border-accent bg-accent text-accent-foreground neon-glow-green"
+                          : "border-accent/50 text-accent/50 hover:border-accent hover:text-accent hover:neon-glow-green"
+                      )}
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <div className="h-8 w-8" />
+                  )}
                 </TableCell>
-                <TableCell className="font-semibold">{r.placa}</TableCell>
-                <TableCell>{r.frota}</TableCell>
-                <TableCell>{r.estado}</TableCell>
-                <TableCell>{r.local}</TableCell>
-                <TableCell>{r.eixo}</TableCell>
-                <TableCell>{r.modelo}</TableCell>
-                <TableCell>{r.status}</TableCell>
+                <TableCell className="font-mono-neon text-primary text-sm">{r.placa}</TableCell>
+                <TableCell className="text-sm">{r.frota}</TableCell>
+                <TableCell className="text-sm">{r.estado}</TableCell>
+                <TableCell className="text-sm">{r.local}</TableCell>
+                <TableCell className="text-sm">{r.eixo}</TableCell>
+                <TableCell className="text-sm">{r.modelo}</TableCell>
+                <TableCell className="text-sm">{r.status}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
